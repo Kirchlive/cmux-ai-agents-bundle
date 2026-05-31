@@ -1,24 +1,275 @@
 {
-  "name": "cmux-ai-agents-bundle",
+  "name": "cmux AI Agents Bundle",
   "id": "cmux-ai-agents-bundle",
+  "version": "1.1.0",
   "owner": {
-    "name": "Kirchlive"
+    "name": "Kirchlive",
+    "github": "https://github.com/Kirchlive"
   },
-  "metadata": {
-    "description": "Lead-magnet repo: skills, hook scripts, recipes, and prompts for orchestrating AI coding agents inside cmux. Free, MIT.",
-    "version": "1.0.2"
-  },
+  "repository": "https://github.com/Kirchlive/cmux-ai-agents-bundle",
+  "description": "Skills, hook scripts, recipes, and prompts for orchestrating AI coding agents inside cmux. Free, MIT.",
+  "categories": [
+    { "id": "core",          "label": "Core",          "icon": "⚙️" },
+    { "id": "notifications", "label": "Notifications", "icon": "🔔" },
+    { "id": "browser",       "label": "Browser",       "icon": "🌐" },
+    { "id": "ui",            "label": "UI & Layout",   "icon": "🪟" },
+    { "id": "agents",        "label": "Agents",        "icon": "🤖" },
+    { "id": "devops",        "label": "DevOps",        "icon": "🚀" },
+    { "id": "automation",    "label": "Automation",    "icon": "⚡" }
+  ],
   "plugins": [
     {
-      "name": "cmux-ai-agents-bundle",
-      "source": "./",
-      "description": "Lead-magnet repo: skills, hook scripts, recipes, and prompts for orchestrating AI coding agents inside cmux. Free, MIT.",
-      "version": "1.0.2",
-      "author": {
-        "name": "Kirchlive"
-      },
-      "keywords": ["agent", "fork", "skill", "claude", "anthropic", "agent-orchestration", "claude-code", "subagents", "context-engineering", "claude-skills", "fork-agent"],
-      "category": "workflow"
+      "id": "cmux-skill",
+      "name": "cmux Control Skill",
+      "type": "skill",
+      "category": "core",
+      "version": "1.1.0",
+      "description": "Full cmux CLI + socket API skill for Claude Code — workspaces, panes, surfaces, browser automation, notifications, sidebar metadata, session restore.",
+      "source": "./skills/cmux-skill",
+      "author": { "name": "Kirchlive" },
+      "license": "MIT",
+      "keywords": ["cmux", "skill", "claude", "agent", "orchestration", "terminal", "browser"],
+      "requires": "cmux >= 1.0"
+    },
+    {
+      "id": "recipe-notify-on-build-fail",
+      "name": "Notify on Build Fail",
+      "type": "recipe",
+      "category": "notifications",
+      "version": "1.0.0",
+      "description": "Runs your build command and fires a cmux system notification when it fails. Zero-config drop-in for any project.",
+      "source": "./cmux-recipes/01-notify-on-build-fail/recipe.sh",
+      "author": { "name": "Kirchlive" },
+      "license": "MIT",
+      "keywords": ["notify", "build", "ci", "fail", "notification"]
+    },
+    {
+      "id": "recipe-flash-on-test-pass",
+      "name": "Flash on Test Pass",
+      "type": "recipe",
+      "category": "notifications",
+      "version": "1.0.0",
+      "description": "Triggers a blue-ring attention flash on the workspace when your test suite passes, so you notice without watching the pane.",
+      "source": "./cmux-recipes/02-flash-on-test-pass/recipe.sh",
+      "author": { "name": "Kirchlive" },
+      "license": "MIT",
+      "keywords": ["flash", "test", "pass", "notification", "attention"]
+    },
+    {
+      "id": "recipe-screenshot-browser-surface",
+      "name": "Screenshot Browser Surface",
+      "type": "recipe",
+      "category": "browser",
+      "version": "1.0.0",
+      "description": "Takes a screenshot of a cmux WKWebView browser surface and saves it to disk. Useful for visual regression checks inside agent workflows.",
+      "source": "./cmux-recipes/03-screenshot-browser-surface/recipe.sh",
+      "author": { "name": "Kirchlive" },
+      "license": "MIT",
+      "keywords": ["screenshot", "browser", "webview", "visual", "automation"]
+    },
+    {
+      "id": "recipe-spawn-helper-pane",
+      "name": "Spawn Focus-Neutral Helper Pane",
+      "type": "recipe",
+      "category": "ui",
+      "version": "1.0.0",
+      "description": "Opens a right-side helper pane in the caller's workspace without stealing focus. Safe to call from any agent hook.",
+      "source": "./cmux-recipes/04-spawn-helper-pane/recipe.sh",
+      "author": { "name": "Kirchlive" },
+      "license": "MIT",
+      "keywords": ["pane", "layout", "split", "helper", "focus"]
+    },
+    {
+      "id": "recipe-send-text-to-other-surface",
+      "name": "Send Text to Another Surface",
+      "type": "recipe",
+      "category": "ui",
+      "version": "1.0.0",
+      "description": "Routes a shell command or text to a specific surface by ref (e.g. surface:7) without switching focus.",
+      "source": "./cmux-recipes/05-send-text-to-other-surface/recipe.sh",
+      "author": { "name": "Kirchlive" },
+      "license": "MIT",
+      "keywords": ["send", "surface", "route", "input", "pane"]
+    },
+    {
+      "id": "recipe-tail-vercel-deploy",
+      "name": "Tail Vercel Deploy with Status Pill",
+      "type": "recipe",
+      "category": "devops",
+      "version": "1.0.0",
+      "description": "Watches a Vercel deployment and updates the sidebar status pill in real time — building → ready or error.",
+      "source": "./cmux-recipes/06-tail-vercel-deploy/recipe.sh",
+      "author": { "name": "Kirchlive" },
+      "license": "MIT",
+      "keywords": ["vercel", "deploy", "status", "sidebar", "devops"]
+    },
+    {
+      "id": "recipe-three-agents-on-pr",
+      "name": "Three Agents on One PR",
+      "type": "recipe",
+      "category": "agents",
+      "version": "1.0.0",
+      "description": "Spawns three parallel Claude Code agent panes in the same workspace — reviewer, implementer, and tester — all anchored to a single PR branch.",
+      "source": "./cmux-recipes/07-three-agents-on-pr/recipe.sh",
+      "author": { "name": "Kirchlive" },
+      "license": "MIT",
+      "keywords": ["agents", "pr", "parallel", "fork", "review", "claude"]
+    },
+    {
+      "id": "recipe-progress-bar-from-script",
+      "name": "Sidebar Progress Bar from Script",
+      "type": "recipe",
+      "category": "notifications",
+      "version": "1.0.0",
+      "description": "Pipes any script's 0–100 output lines into the cmux sidebar progress bar. Works with any build, migration, or batch job.",
+      "source": "./cmux-recipes/08-progress-bar-from-script/recipe.sh",
+      "author": { "name": "Kirchlive" },
+      "license": "MIT",
+      "keywords": ["progress", "sidebar", "script", "bar", "build"]
+    },
+    {
+      "id": "recipe-sidebar-status-pill",
+      "name": "Sticky Sidebar Status Pill",
+      "type": "recipe",
+      "category": "notifications",
+      "version": "1.0.0",
+      "description": "Sets a persistent color-coded status label on the workspace sidebar — useful for displaying environment, branch state, or agent status.",
+      "source": "./cmux-recipes/09-sidebar-status-pill/recipe.sh",
+      "author": { "name": "Kirchlive" },
+      "license": "MIT",
+      "keywords": ["status", "pill", "sidebar", "label", "color"]
+    },
+    {
+      "id": "recipe-open-markdown-with-watch",
+      "name": "Open Markdown in Live Viewer",
+      "type": "recipe",
+      "category": "ui",
+      "version": "1.0.0",
+      "description": "Opens a .md file in the cmux live-watching Markdown renderer in a new right-side pane, so documentation updates are visible as you write.",
+      "source": "./cmux-recipes/10-open-markdown-with-watch/recipe.sh",
+      "author": { "name": "Kirchlive" },
+      "license": "MIT",
+      "keywords": ["markdown", "preview", "viewer", "live", "docs"]
+    },
+    {
+      "id": "recipe-browser-fill-and-submit",
+      "name": "Browser Fill & Submit Form",
+      "type": "recipe",
+      "category": "browser",
+      "version": "1.0.0",
+      "description": "Opens a URL, waits for load, fills form fields by element ref, and submits — full WKWebView browser automation from a shell script.",
+      "source": "./cmux-recipes/11-browser-fill-and-submit/recipe.sh",
+      "author": { "name": "Kirchlive" },
+      "license": "MIT",
+      "keywords": ["browser", "form", "fill", "submit", "automation", "webview"]
+    },
+    {
+      "id": "recipe-poll-socket-for-events",
+      "name": "Poll Socket for Surface Events",
+      "type": "recipe",
+      "category": "automation",
+      "version": "1.0.0",
+      "description": "Connects to /tmp/cmux.sock via JSON-RPC and polls a surface for new output lines. Low-overhead event loop for shell-based watchers.",
+      "source": "./cmux-recipes/12-poll-socket-for-events/recipe.sh",
+      "author": { "name": "Kirchlive" },
+      "license": "MIT",
+      "keywords": ["socket", "rpc", "poll", "event", "surface", "automation"]
+    },
+    {
+      "id": "recipe-detect-cmux-context",
+      "name": "Detect cmux Context",
+      "type": "recipe",
+      "category": "automation",
+      "version": "1.0.0",
+      "description": "Guards any script with a cmux presence check using CMUX_WORKSPACE_ID and the socket path. Drop this at the top of any hook script.",
+      "source": "./cmux-recipes/13-detect-cmux-context/recipe.sh",
+      "author": { "name": "Kirchlive" },
+      "license": "MIT",
+      "keywords": ["detect", "guard", "context", "hook", "workspace"]
+    },
+    {
+      "id": "recipe-python-rpc-client",
+      "name": "Minimal Python JSON-RPC Client",
+      "type": "recipe",
+      "category": "automation",
+      "version": "1.0.0",
+      "description": "Two-function Python snippet for talking to /tmp/cmux.sock — send any JSON-RPC v2 method and parse the response. No dependencies beyond stdlib.",
+      "source": "./cmux-recipes/14-python-rpc-client/recipe.sh",
+      "author": { "name": "Kirchlive" },
+      "license": "MIT",
+      "keywords": ["python", "rpc", "socket", "client", "jsonrpc", "stdlib"]
+    },
+    {
+      "id": "recipe-batch-rename-workspaces",
+      "name": "Batch Rename Workspaces by CWD",
+      "type": "recipe",
+      "category": "ui",
+      "version": "1.0.0",
+      "description": "Loops over all open workspaces and renames each one to the basename of its working directory. Tidies up after a busy session.",
+      "source": "./cmux-recipes/15-batch-rename-workspaces/recipe.sh",
+      "author": { "name": "Kirchlive" },
+      "license": "MIT",
+      "keywords": ["rename", "workspace", "batch", "tidy", "layout"]
+    },
+    {
+      "id": "recipe-auto-flash-on-stale-pr",
+      "name": "Auto Flash on Stale PR",
+      "type": "recipe",
+      "category": "devops",
+      "version": "1.0.0",
+      "description": "Polls GitHub for PRs that have gone stale (no activity in N days) and triggers a workspace flash to prompt the agent to follow up.",
+      "source": "./cmux-recipes/16-auto-flash-on-stale-pr/recipe.sh",
+      "author": { "name": "Kirchlive" },
+      "license": "MIT",
+      "keywords": ["pr", "stale", "github", "flash", "devops", "poll"]
+    },
+    {
+      "id": "recipe-ssh-remote-workspace",
+      "name": "Open SSH Remote Workspace",
+      "type": "recipe",
+      "category": "devops",
+      "version": "1.0.0",
+      "description": "Creates a new cmux workspace with an SSH connection to a remote VPS as the default shell, then optionally launches an agent inside it.",
+      "source": "./cmux-recipes/17-ssh-remote-workspace/recipe.sh",
+      "author": { "name": "Kirchlive" },
+      "license": "MIT",
+      "keywords": ["ssh", "remote", "vps", "workspace", "devops"]
+    },
+    {
+      "id": "recipe-browser-wait-for-element",
+      "name": "Browser Wait for Element",
+      "type": "recipe",
+      "category": "browser",
+      "version": "1.0.0",
+      "description": "Waits for a CSS selector to appear in a WKWebView surface before the next automation step. Prevents flaky timing errors in browser scripts.",
+      "source": "./cmux-recipes/18-browser-wait-for-element/recipe.sh",
+      "author": { "name": "Kirchlive" },
+      "license": "MIT",
+      "keywords": ["browser", "wait", "selector", "css", "automation", "timing"]
+    },
+    {
+      "id": "recipe-agent-handoff-notification",
+      "name": "Agent Handoff Notification",
+      "type": "recipe",
+      "category": "agents",
+      "version": "1.0.0",
+      "description": "Sends a cmux notification when one agent finishes and passes context to the next — useful in multi-agent pipelines where agents hand off work sequentially.",
+      "source": "./cmux-recipes/19-agent-handoff-notification/recipe.sh",
+      "author": { "name": "Kirchlive" },
+      "license": "MIT",
+      "keywords": ["handoff", "agent", "notify", "pipeline", "orchestration"]
+    },
+    {
+      "id": "recipe-restore-session-on-boot",
+      "name": "Restore Session on Boot",
+      "type": "recipe",
+      "category": "automation",
+      "version": "1.0.0",
+      "description": "Calls cmux session restore from a login script (e.g. ~/.zprofile), so your full agent workspace layout is rebuilt automatically after a reboot.",
+      "source": "./cmux-recipes/20-restore-session-on-boot/recipe.sh",
+      "author": { "name": "Kirchlive" },
+      "license": "MIT",
+      "keywords": ["session", "restore", "boot", "startup", "login", "workspace"]
     }
   ]
 }

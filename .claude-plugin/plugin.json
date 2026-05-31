@@ -1,11 +1,19 @@
 {
   "name": "cmux-ai-agents-bundle",
-  "description": "Lead-magnet repo: skills, hook scripts, recipes, and prompts for orchestrating AI coding agents inside cmux. Free, MIT.",
-  "version": "1.0.2",
+  "description": "Skills, hook scripts, recipes, and prompts for orchestrating AI coding agents inside cmux. Includes 20 ready-to-run recipes and the full cmux control skill. Free, MIT.",
+  "version": "1.1.0",
   "author": {
-    "name": "Kirchlive"
+    "name": "Kirchlive",
+    "github": "https://github.com/Kirchlive"
   },
+  "repository": "https://github.com/Kirchlive/cmux-ai-agents-bundle",
   "license": "MIT",
-  "keywords": ["agent", "fork", "skill", "claude", "anthropic", "agent-orchestration", "claude-code", "subagents", "context-engineering", "claude-skills", "fork-agent"],
-  "skills": ["./skills/cmux-skill"]
+  "keywords": [
+    "agent", "fork", "skill", "claude", "anthropic",
+    "agent-orchestration", "claude-code", "subagents",
+    "context-engineering", "claude-skills", "fork-agent",
+    "cmux", "terminal", "browser-automation", "recipe"
+  ],
+  "skills": ["./skills/cmux-skill"],
+  "marketplace": "./.claude-plugin/marketplace.json"
 }
