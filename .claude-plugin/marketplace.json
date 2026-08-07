@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Lead-magnet repo: skills, hook scripts, recipes, and prompts for orchestrating AI coding agents inside cmux. Free, MIT.",
-    "version": "1.0.2"
+    "version": "1.0.3"
   },
   "plugins": [
     {
       "name": "cmux-ai-agents-bundle",
       "source": "./",
       "description": "Lead-magnet repo: skills, hook scripts, recipes, and prompts for orchestrating AI coding agents inside cmux. Free, MIT.",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "author": {
         "name": "Kirchlive"
       },
