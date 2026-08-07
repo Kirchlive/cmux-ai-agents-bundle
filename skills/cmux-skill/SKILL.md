@@ -1,11 +1,15 @@
 ---
 name: cmux
-description: Drive the cmux native macOS terminal app from CLI or socket — workspaces, panes, surfaces, browser automation, notifications, sidebar metadata, session restore. Use whenever the user mentions cmux, wants to control terminal layout from an agent, automate browser panels on macOS, send notifications/flashes to the sidebar, or integrate an AI agent with cmux hooks. macOS only (14.0+).
+description: Drive the cmux native macOS terminal app from CLI or socket — workspaces, panes, surfaces, sending input to and reading output from other surfaces, driving a second AI agent session, browser automation, notifications, sidebar metadata, session restore. Use whenever the user mentions cmux, wants to control terminal layout from an agent, start or steer another agent session in a split, read what another surface printed, automate browser panels on macOS, send notifications/flashes to the sidebar, or integrate an AI agent with cmux hooks. macOS only (14.0+).
 ---
 
 # cmux Control
 
-cmux is a native macOS terminal app for running multiple AI coding agents in parallel. It exposes a CLI (`cmux`) and a Unix-socket JSON-RPC API (`/tmp/cmux.sock`) for full topology and browser control.
+cmux is a native macOS terminal app for running multiple AI coding agents in parallel. It exposes a CLI (`cmux`) and a Unix-socket JSON-RPC API for full topology and browser control.
+
+**Verb names below can drift between builds. `cmux --help` is the authority** — grep it before using a verb you have not run in this build, and on any `Unknown command` error grep it rather than guessing a variant.
+
+The socket path is `$CMUX_SOCKET_PATH` (e.g. `~/.local/state/cmux/cmux-<uid>.sock`), not a fixed `/tmp/cmux.sock`. Always read it from the environment.
 
 ## Core Concepts
 
@@ -32,7 +36,8 @@ cmux identify --json                              # who am I (window/workspace/p
 cmux tree                                         # full hierarchy
 cmux list-workspaces --json
 cmux list-panes --workspace "$CMUX_WORKSPACE_ID"
-cmux list-surfaces --workspace "$CMUX_WORKSPACE_ID"
+cmux list-pane-surfaces --pane pane:2                 # surfaces of one pane
+cmux surface-health --surface surface:2               # is it alive / in-window
 
 cmux new-workspace --name "feature-x" --cwd /path/to/repo
 cmux new-pane --workspace "$CMUX_WORKSPACE_ID" --type terminal --direction right --focus false
@@ -43,14 +48,47 @@ cmux reorder-surface --surface surface:7 --before surface:3
 cmux close-surface --surface surface:7
 ```
 
-## Send Input
+## Send Input & Read Output
 
 ```bash
-cmux send "echo hi\n"                                       # focused terminal
-cmux send-key "ctrl+c"                                       # enter|tab|esc|backspace|arrows|ctrl+x|shift+tab
-cmux send-surface --surface surface:7 "npm run build\n"      # specific surface
-cmux send-key-surface --surface surface:7 enter
+cmux send "echo hi"                                    # focused terminal
+cmux send --surface surface:7 "npm run build"          # specific surface
+cmux send-key --surface surface:7 enter                # enter|tab|esc|backspace|arrows|ctrl+x|shift+tab
+cmux send-panel --panel panel:1 "text"                 # panel variant
+
+cmux read-screen --surface surface:7 --lines 45        # snapshot of what is on screen
+cmux read-screen --surface surface:7 --scrollback      # include scrollback
+cmux capture-pane --surface surface:7 --lines 200      # same, pane-oriented
 ```
+
+`read-screen` is the only way to see output. There is no streaming/tail verb — poll it after an action instead of building a watcher. Send text and the newline **separately** (`send`, then `send-key … enter`); embedding `\n` is unreliable in TUIs.
+
+## Driving a Second Agent Session
+
+Reuse an existing non-caller pane; only create one if none exists. Anchor to
+`cmux identify --json` (`caller.pane_ref`) so the agent never drives its own surface.
+
+```bash
+cmux identify --json                                   # caller.pane_ref = own pane — avoid it
+S=surface:2                                            # a pane you do NOT occupy
+cmux send --surface $S 'claude --dangerously-skip-permissions'
+cmux send-key --surface $S enter
+sleep 14                                               # TUI boot; input before this hits the shell
+cmux send --surface $S 'your prompt'
+sleep 1                                                # let the slash/autocomplete popup settle
+cmux send-key --surface $S enter
+cmux read-screen --surface $S --lines 40               # poll for the result
+```
+
+- **`sleep 1` between text and Enter.** Without it a slash-command popup swallows the Enter.
+- **`send-key … ctrl+u`** clears a half-typed line before sending something new.
+- **`/exit`** ends an agent session cleanly; the surface is then reusable for a fresh start.
+- **Menus** (e.g. `/mcp`) are navigable blind: send `down` N times, `read-screen` to confirm the
+  cursor row, only then `enter`.
+- **Do not identify the child by process name.** cmux launches agents as
+  `claude --session-id <uuid> --settings {…}`, so `pgrep -f "claude --dangerously"` finds
+  nothing, and a permanent cmux helper process looks like a user session. Use
+  `cmux top --processes` instead.
 
 ## Notifications & Sidebar Metadata
 
@@ -129,10 +167,10 @@ Native session-resume supported for: Claude Code, Codex, Grok, OpenCode, Pi, Amp
 
 ## Socket API (advanced)
 
-`/tmp/cmux.sock` — Unix socket, JSON-RPC v2. Use for tight loops where subprocess spawn cost matters; otherwise prefer the CLI.
+`$CMUX_SOCKET_PATH` — Unix socket, JSON-RPC v2. Use for tight loops where subprocess spawn cost matters; otherwise prefer the CLI.
 
 ```bash
-echo '{"id":"1","method":"workspace.list","params":{}}' | nc -U /tmp/cmux.sock
+echo '{"id":"1","method":"workspace.list","params":{}}' | nc -U "$CMUX_SOCKET_PATH"
 ```
 
 Method prefixes: `system.*`, `window.*`, `workspace.*`, `pane.*`, `surface.*`, `notification.*`, `browser.*`. Full list and Python client example in `references/socket-api.md`.
@@ -152,6 +190,8 @@ These rules come from the `cmux-workspace` skill and prevent agents from yanking
 
 ## Common Pitfalls
 
+- **`Unknown command` → grep `cmux --help`, do not guess a variant.** Verb names differ between builds; this document can lag behind the installed one.
+- **Recipes use the socket API, not these CLI verbs.** Do not expect `cmux-recipes/` to demonstrate `send`, `send-key` or `read-screen`.
 - **Pi/Pi-like socket connection failures from external processes** → default `cmuxOnly` mode; either run inside a cmux terminal or change socket mode.
 - **macOS only.** No Linux/Windows port.
 - **WKWebView ≠ CDP.** Don't expect Playwright-equivalent network mocking or viewport emulation.
