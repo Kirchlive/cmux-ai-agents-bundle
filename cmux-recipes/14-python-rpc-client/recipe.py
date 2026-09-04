@@ -2,7 +2,7 @@
 """Minimal cmux JSON-RPC client. Usage: python3 recipe.py"""
 import json, os, socket
 
-SOCK = os.environ.get("CMUX_SOCKET_PATH", "/tmp/cmux.sock")
+SOCK = os.environ.get("CMUX_SOCKET_PATH", os.path.expanduser(f"~/.local/state/cmux/cmux-{os.getuid()}.sock"))
 
 def rpc(method, params=None, req_id="1"):
     payload = {"id": req_id, "method": method, "params": params or {}}

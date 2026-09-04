@@ -13,7 +13,7 @@ If you have ever opened five cmux workspaces, lost track of which agent owns whi
 | Folder | What it is |
 |---|---|
 | [`awesome-cmux/`](./awesome-cmux) | Curated index of every cmux resource — docs, skills, agents, blog posts, demos. The bookmark you keep open. |
-| [`cmux-skill/`](./cmux-skill) | Drop-in skill that teaches any AI coding agent how to drive cmux from the CLI or socket — workspaces, panes, surfaces, browser automation, notifications, and the non-disruptive focus rules. |
+| [`skills/cmux-skill/`](./skills/cmux-skill) | Drop-in skill that teaches any AI coding agent how to drive cmux from the CLI or socket — workspaces, panes, surfaces, browser automation, notifications, the non-disruptive focus rules, and how to **wait for another agent session to finish** without polling the screen (`scripts/wait-idle.sh`). |
 | [`cmux-recipes/`](./cmux-recipes) | 20 numbered, copy-paste recipes (CLI + Python + Bash) for the socket API: notify-on-build-fail, flash-on-test-pass, screenshot a browser surface, run three agents on one PR, and more. |
 
 ---
@@ -21,12 +21,16 @@ If you have ever opened five cmux workspaces, lost track of which agent owns whi
 ## Quick start
 
 ```bash
-git clone https://github.com/pawel-cell/cmux-ai-agents-bundle.git
+git clone https://github.com/Kirchlive/cmux-ai-agents-bundle.git
 cd cmux-ai-agents-bundle
 
-# Wire the cmux skill into Claude Code (or your agent of choice)
-mkdir -p ~/.claude/skills/cmux
-cp cmux-skill/SKILL.md ~/.claude/skills/cmux/SKILL.md
+# Wire the cmux skill into Claude Code (or your agent of choice) — copy the whole
+# folder: SKILL.md alone loses references/ and scripts/wait-idle.sh
+cp -R skills/cmux-skill ~/.claude/skills/cmux
+
+# or install it as a plugin from this repo's marketplace
+claude plugin marketplace add Kirchlive/cmux-ai-agents-bundle
+claude plugin install cmux-ai-agents-bundle@cmux-ai-agents-bundle
 
 # Browse the recipes
 ls cmux-recipes/

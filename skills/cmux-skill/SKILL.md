@@ -1,213 +1,320 @@
 ---
 name: cmux
-description: Drive the cmux native macOS terminal app from CLI or socket — workspaces, panes, surfaces, sending input to and reading output from other surfaces, driving a second AI agent session, browser automation, notifications, sidebar metadata, session restore. Use whenever the user mentions cmux, wants to control terminal layout from an agent, start or steer another agent session in a split, read what another surface printed, automate browser panels on macOS, send notifications/flashes to the sidebar, or integrate an AI agent with cmux hooks. macOS only (14.0+).
+description: Drive the cmux native macOS terminal app from the CLI or its socket — inspect and build the window/workspace/pane/surface layout, send input to and read output from other surfaces, start and steer a second AI agent session in a split and wait for it to finish without burning minutes on screen polling, automate browser panels, post notifications and sidebar status, read the agent event log. Use this whenever the user mentions cmux, wants an agent to control terminal layout, asks to run, prompt, mentor, supervise or observe another Claude Code / Codex / agent session from this one, wants to know when another session is done or idle, or needs macOS browser automation from a terminal — even if they do not say "cmux" but the shell has CMUX_* variables set. macOS only (14.0+).
 ---
 
 # cmux Control
 
-cmux is a native macOS terminal app for running multiple AI coding agents in parallel. It exposes a CLI (`cmux`) and a Unix-socket JSON-RPC API for full topology and browser control.
+cmux is a native macOS terminal for running several AI coding agents side by
+side. Everything the UI can do is reachable through the `cmux` CLI, which is a
+thin client over a Unix-socket JSON-RPC API.
 
-**Verb names below can drift between builds. `cmux --help` is the authority** — grep it before using a verb you have not run in this build, and on any `Unknown command` error grep it rather than guessing a variant.
+## Find the truth in the installed build first
 
-The socket path is `$CMUX_SOCKET_PATH` (e.g. `~/.local/state/cmux/cmux-<uid>.sock`), not a fixed `/tmp/cmux.sock`. Always read it from the environment.
+Verb names, options and even which verbs exist change between builds, and this
+document lags behind the binary. Three rules:
 
-## Core Concepts
+- `cmux --help` is the only authority. It prints the whole verb table; grep it
+  before using a verb you have not run in this build.
+- **There is no per-verb help.** `cmux <verb> --help` returns `Unknown command`
+  on 0.64.x. Topic docs exist instead: `cmux docs settings|shortcuts|api|browser|agents|dock`.
+- On `Unknown command`, grep `cmux --help` — do not guess a variant. Some
+  verbs are aliases of newer forms (`list-workspaces` → `workspace list`) and
+  print a deprecation notice; set `CMUX_QUIET=1` to silence it in scripts.
 
-- **Window** — top-level macOS cmux window
-- **Workspace** — sidebar tab within a window (one git branch / project context)
+If `cmux` is not on `PATH`, it lives at
+`/Applications/cmux.app/Contents/Resources/bin/cmux`. `cmux capabilities --json`
+enumerates the socket methods of the running build.
+
+## Concepts and handles
+
+- **Window** — top-level macOS window
+- **Workspace** — sidebar tab inside a window (one project or branch)
 - **Pane** — split region inside a workspace
-- **Surface** — tab inside a pane (terminal or browser)
+- **Surface** — tab inside a pane: terminal, browser, simulator or agent-session
 
-Handles default to short refs (`workspace:2`, `pane:1`, `surface:7`); UUIDs accepted as input. Add `--id-format uuids|both` for full IDs in output.
+Handles are short refs (`workspace:2`, `pane:1`, `surface:7`); UUIDs and
+indices are accepted as input. Add `--id-format uuids|both` for full IDs in
+output.
 
-## Detect cmux in a Shell
+## Detect cmux from a shell
+
+Every cmux-spawned terminal carries `CMUX_WORKSPACE_ID`, `CMUX_SURFACE_ID`,
+`CMUX_SOCKET_PATH` and `CMUX_PORT`.
 
 ```bash
-[ -S "${CMUX_SOCKET_PATH:-/tmp/cmux.sock}" ] || exit 0   # bail if not in cmux
-[ -n "${CMUX_WORKSPACE_ID:-}" ] && echo "inside cmux surface"
+[ -S "${CMUX_SOCKET_PATH:-}" ] || exit 0        # not inside cmux
+cmux identify --json                             # window / workspace / pane / surface of the caller
 ```
 
-Injected env vars in every cmux-spawned terminal: `CMUX_WORKSPACE_ID`, `CMUX_SURFACE_ID`, `CMUX_SOCKET_PATH`, `CMUX_PORT`. **Always anchor automation to `CMUX_WORKSPACE_ID`** — the visually focused workspace may not be the agent's caller workspace.
+Anchor every automation to `CMUX_WORKSPACE_ID` and to `caller.pane_ref` from
+`identify` — the visually focused workspace is not necessarily yours, and the
+one surface you must never drive is your own.
 
-## Fast Start — Topology
+The socket path is whatever `CMUX_SOCKET_PATH` says (usually
+`~/.local/state/cmux/cmux-<uid>.sock`), never a fixed `/tmp/cmux.sock`.
+
+## Topology
 
 ```bash
-cmux identify --json                              # who am I (window/workspace/pane/surface)
-cmux tree                                         # full hierarchy
+cmux tree                                              # full hierarchy
 cmux list-workspaces --json
 cmux list-panes --workspace "$CMUX_WORKSPACE_ID"
-cmux list-pane-surfaces --pane pane:2                 # surfaces of one pane
-cmux surface-health --surface surface:2               # is it alive / in-window
+cmux list-pane-surfaces --pane pane:2
+cmux surface-health --surface surface:2                # alive / in-window?
 
-cmux new-workspace --name "feature-x" --cwd /path/to/repo
+cmux new-workspace --name "feature-x" --cwd /path/to/repo --focus false
 cmux new-pane --workspace "$CMUX_WORKSPACE_ID" --type terminal --direction right --focus false
-cmux new-pane --workspace "$CMUX_WORKSPACE_ID" --type browser  --direction right --url http://localhost:3000
+cmux new-surface --pane pane:2 --type agent-session --provider claude --focus false   # or codex | opencode
 cmux move-surface --surface surface:7 --pane pane:2 --focus false
 cmux split-off --surface surface:7 right
-cmux reorder-surface --surface surface:7 --before surface:3
 cmux close-surface --surface surface:7
 ```
 
-## Send Input & Read Output
+Build layout additively and in one call where you can (`new-pane … --focus
+false`) instead of create → move → focus chains.
+
+## Send input, read output
 
 ```bash
-cmux send "echo hi"                                    # focused terminal
-cmux send --surface surface:7 "npm run build"          # specific surface
-cmux send-key --surface surface:7 enter                # enter|tab|esc|backspace|arrows|ctrl+x|shift+tab
-cmux send-panel --panel panel:1 "text"                 # panel variant
+cmux send --surface surface:7 "npm run build"           # text only
+cmux send-key --surface surface:7 enter                 # enter|tab|esc|backspace|up|down|left|right|ctrl+x|shift+tab
+cmux send-key --surface surface:7 ctrl+u                # clear a half-typed line first
 
-cmux read-screen --surface surface:7 --lines 45        # snapshot of what is on screen
-cmux read-screen --surface surface:7 --scrollback      # include scrollback
-cmux capture-pane --surface surface:7 --lines 200      # same, pane-oriented
+cmux read-screen --surface surface:7 --lines 45         # what is on screen now
+cmux read-screen --surface surface:7 --scrollback       # include scrollback
+cmux capture-pane --surface surface:7 --lines 200       # tmux-style alias
 ```
 
-`read-screen` is the only way to see output. There is no streaming/tail verb — poll it after an action instead of building a watcher. Send text and the newline **separately** (`send`, then `send-key … enter`); embedding `\n` is unreliable in TUIs.
+Send text and the newline **separately**; an embedded `\n` is unreliable in
+TUIs. In a Claude Code prompt, `sleep 1` between `send` and `enter`, or the
+slash-command popup swallows the Enter.
 
-## Driving a Second Agent Session
+`read-screen` is a snapshot, not a stream. For a stream, `cmux events` tails
+the app's event log and `pipe-pane --command` forwards a surface's output to a
+command — both exist on 0.64.x; use them before building a polling watcher.
 
-Reuse an existing non-caller pane; only create one if none exists. Anchor to
-`cmux identify --json` (`caller.pane_ref`) so the agent never drives its own surface.
+## Driving a second agent session
+
+Reuse an existing non-caller pane; create one only if none exists. Then:
 
 ```bash
-cmux identify --json                                   # caller.pane_ref = own pane — avoid it
-S=surface:2                                            # a pane you do NOT occupy
-cmux send --surface $S 'claude --dangerously-skip-permissions'
+S=surface:7                                            # a surface you do NOT occupy
+cmux send --surface $S 'claude'
 cmux send-key --surface $S enter
-sleep 14                                               # TUI boot; input before this hits the shell
+sleep 14                                               # TUI boot; earlier input hits the shell
 cmux send --surface $S 'your prompt'
-sleep 1                                                # let the slash/autocomplete popup settle
+sleep 1
 cmux send-key --surface $S enter
-cmux read-screen --surface $S --lines 40               # poll for the result
 ```
 
-- **`sleep 1` between text and Enter.** Without it a slash-command popup swallows the Enter.
-- **`send-key … ctrl+u`** clears a half-typed line before sending something new.
-- **`/exit`** ends an agent session cleanly; the surface is then reusable for a fresh start.
-- **Menus** (e.g. `/mcp`) are navigable blind: send `down` N times, `read-screen` to confirm the
-  cursor row, only then `enter`.
-- **Do not identify the child by process name.** cmux launches agents as
-  `claude --session-id <uuid> --settings {…}`, so `pgrep -f "claude --dangerously"` finds
-  nothing, and a permanent cmux helper process looks like a user session. Use
-  `cmux top --processes` instead.
+- `/exit` ends the session cleanly; the surface is reusable afterwards.
+- Menus (`/mcp`, `/model`) are navigable blind: send `down` N times,
+  `read-screen` to confirm the cursor row, then `enter`.
+- Do not identify the child by process name: cmux launches agents as
+  `claude --session-id <uuid> --settings {…}`, so `pgrep -f "claude
+  --dangerously"` finds nothing. Use `cmux top --processes`, or read the session
+  id off the footer of the surface.
 
-## Notifications & Sidebar Metadata
+### Wait for it to finish — do not poll the screen for stillness
+
+This is where most of the wasted time in agent-driving-agent setups goes.
+A "screen stopped changing" loop needs a change-free window that the
+footer's per-minute counters keep breaking; measured, it waits minutes for a
+turn that ended seconds ago and sometimes reports "still working" by mistake.
+It also cannot tell "done" from "waiting on a permission prompt".
+
+cmux already knows. Its agent hooks keep one lifecycle record per session —
+`running`, `idle`, `needsInput`, `unknown` — for **every agent it has hooks
+for**, and every one of those agents maps its own events onto the same three
+transitions (prompt submitted → running, stop → idle, notification →
+needsInput). That record is the signal, and it is the same for Claude Code,
+Codex, Kimi Code, Gemini, OpenCode, Antigravity, Grok, Pi, Amp, Cursor,
+Copilot and the rest:
+
+```bash
+cmux sessions --agent codex --json          # all agents when --agent is omitted; no socket needed
+# → sessions[].agent_lifecycle, session_id, cwd, pid, surface_id, updated_at_unix
+```
+
+`cmux sessions` is not listed by `cmux --help` on 0.64.22 but exists; the
+same data is in `~/.cmuxterm/<agent>-hook-sessions.json` (`agentLifecycle`)
+for builds that lack the verb. The bundled script wraps both, with a
+screen-hash fallback for sessions that have no record:
+
+```bash
+scripts/wait-idle.sh --agent claude --session <id-prefix> --fresh --timeout 600
+scripts/wait-idle.sh --agent codex  --cwd /path/to/repo
+# exit 0 idle · 3 needs input · 2 timeout · 4 no record and no --surface
+```
+
+`--fresh` after sending a prompt: it refuses an idle state recorded before
+the script started, so the peer's previous idle does not count as done.
+Read the surface only after exit 0.
+
+One precondition: the agent must have cmux hooks installed. Claude Code gets
+them through the cmux wrapper; every other agent needs `cmux hooks setup
+<agent>` once (`cmux hooks setup` does all that are on `PATH`). No record →
+no signal → the script falls back to the screen hash, which needs `--surface`
+and the socket. Claude Code additionally offers its own session record and
+`notify_when_idle`; both are extras, not the primary signal — see
+[references/waiting-for-an-agent.md](references/waiting-for-an-agent.md).
+
+**Short tasks: send and wait in one call, no script.** For a prompt you
+expect back within a minute or two, subscribe to the hook event *before*
+sending and block on it — the event stream reacts in well under a second
+and needs no polling. Works from inside cmux (socket) for every hooked
+agent:
+
+```bash
+S=surface:7; SID=507e4562; F=$(mktemp)                        # peer surface, its session-id prefix
+cmux events --name agent.hook.Stop --name agent.hook.Notification --no-ack --no-heartbeat --timeout 100 >"$F" 2>/dev/null & EV=$!
+cmux send --surface $S 'rename the helper and run the tests'; sleep 1; cmux send-key --surface $S enter
+until grep -q "$SID" "$F"; do kill -0 $EV 2>/dev/null || break; sleep 0.2; done; kill $EV 2>/dev/null
+grep -q "agent.hook.Notification.*$SID" "$F" && echo NEEDS-INPUT; grep -q "agent.hook.Stop.*$SID" "$F" && echo DONE || echo TIMEOUT
+rm -f "$F"; cmux read-screen --surface $S --lines 40
+```
+
+Subscribe first, send second: the stream carries no history (without
+`--after` it starts at the latest sequence), so a Stop that fires before the
+subscription exists is never seen. Keep `--timeout` under the Bash tool's
+limit; when it expires, fall back to the script below in the background.
+For anything longer than a couple of minutes, or when you want to keep
+working meanwhile, use the script.
+
+Run the long wait in the background. Its completion line is written as an
+instruction (`WAIT-IDLE: DONE … NEXT: …`), and it will usually arrive
+**while you are doing something else**. That is the case where reviews get
+lost, so treat it as a rule, not a hint:
+
+- **A completion notification is a queued task, not information.** The
+  moment it arrives, add "review <session>" to your task list as the next
+  item after the step you are on. Do not acknowledge it in prose and move on.
+- **Finish the current step, then review — before any new prompt to
+  anyone.** Read the peer's surface, check what it produced (commits, tests,
+  files), decide accept / correct / continue, and only then send the next
+  instruction.
+- **Exit 3 (`NEEDS INPUT`) jumps the queue.** The peer is blocked on a
+  permission prompt or a question; nothing it does progresses until you
+  answer. Interrupt your own step for that.
+- **If a wait returned and you cannot find its notification, check the
+  lifecycle yourself** (`cmux sessions --agent … --json`) before assuming
+  the peer is still working — a background task whose output you never read
+  looks exactly like one that never finished.
+
+Two consequences for the sending side:
+
+- **Idle first, then send.** A prompt delivered mid-turn queues behind the
+  running work and can leave it half-finished, or answer a question the agent
+  was about to ask. Check, send, `sleep 1`, enter.
+- **A wait longer than two minutes needs the Bash tool's timeout raised** or it
+  is killed silently; better, run it in the background so the completion
+  notification wakes you and the polling output stays out of your context.
+
+## Notifications and sidebar metadata
 
 ```bash
 cmux notify --title "Done" --body "tests passed"
 cmux set-status build "compiling" --icon hammer --color "#ff9500"
 cmux set-progress 0.5 --label "Building..."
-cmux log --level success "All 42 tests passed"               # info|progress|success|warning|error
-cmux trigger-flash --workspace "$CMUX_WORKSPACE_ID"          # blue-ring attention cue
-cmux sidebar-state --json                                    # dump all sidebar metadata
+cmux log --level success "All 42 tests passed"          # info|progress|success|warning|error
+cmux trigger-flash --workspace "$CMUX_WORKSPACE_ID"     # blue-ring attention cue
+cmux list-status --workspace "$CMUX_WORKSPACE_ID"       # includes the agents' claude_code state
+cmux sidebar-state --json
 ```
 
-## Browser Automation (WKWebView)
+## Browser, markdown, files
 
-Workflow: open → wait → snapshot → act → re-snapshot.
+Browser surfaces are WKWebViews driven with `cmux browser <surface> …`
+(open → wait → snapshot → act → re-snapshot). The verbs, their limits and the
+things WKWebView cannot do are in [references/browser.md](references/browser.md).
 
 ```bash
-S=$(cmux --json browser open https://example.com | jq -r .result.surface_ref)
-cmux browser "$S" wait --load-state complete --timeout-ms 15000
-cmux browser "$S" snapshot --interactive                     # returns elements as e1, e2, ...
-cmux browser "$S" fill e1 "jane@example.com"
-cmux browser "$S" click e2 --snapshot-after
-
-# Navigation / inspection
-cmux browser "$S" goto URL | back | forward | reload
-cmux browser "$S" get url | get title | get text body | get value "#email" | get count ".row"
-cmux browser "$S" eval 'return document.title'
-
-# Waits
-cmux browser "$S" wait --selector "#ready" --timeout-ms 10000
-cmux browser "$S" wait --url-contains "/dashboard" --timeout-ms 10000
-
-# Session
-cmux browser "$S" cookies get | cookies set --name foo --value bar
-cmux browser "$S" state save /tmp/auth.json | state load /tmp/auth.json
-
-# Diagnostics
-cmux browser "$S" console list | errors list | screenshot
+cmux markdown open plan.md --direction right            # live-reloading viewer
+cmux open file.pdf                                      # routes to the right viewer
+cmux diff --unstaged --workspace "$CMUX_WORKSPACE_ID"   # diff viewer surface
 ```
 
-**Not supported by WKWebView** (return `not_supported`): viewport emulation, geolocation/offline emulation, trace recording, network route interception, raw input injection.
-
-## Markdown Viewer
+## Settings
 
 ```bash
-cmux markdown open plan.md --direction right                 # live-watching renderer
-cmux open file.pdf                                           # auto-routes to right viewer
+cmux docs settings        # paths, schema URL, reload command — read before editing
+cmux settings path        # ~/.config/cmux/cmux.json
+cmux config doctor
+cmux reload-config        # hot-reloads cmux.json and ~/.config/ghostty/config, no restart
 ```
 
-## Settings & Config
+cmux-owned behaviour lives in `~/.config/cmux/cmux.json`; terminal rendering
+(font, theme, opacity, blur, scrollback) lives in `~/.config/ghostty/config`.
+Back up `cmux.json` to a timestamped `.bak` next to it before editing.
 
-```bash
-cmux docs settings        # prints paths, schema URL, reload cmd — read BEFORE editing
-cmux settings path        # path to cmux.json
-cmux settings cmux-json   # open in editor
-cmux reload-config        # hot-reload cmux.json + ~/.config/ghostty/config (Cmd+Shift+,)
-```
+## Socket access from outside cmux
 
-Locations:
-- cmux settings: `~/.config/cmux/cmux.json` (canonical). Project-local override: `.cmux/cmux.json` or `./cmux.json`.
-- Terminal rendering (font, cursor, theme, scrollback, opacity, blur): `~/.config/ghostty/config` — NOT cmux.json.
+The socket admits only processes started inside cmux by default
+(`cmuxOnly`); an external process gets `Access denied`. The mode is read at
+app start, so flipping it in preferences does not affect the running app, and
+restarting cmux ends every hosted session. When something outside cmux has to
+observe or wait for an agent, use the file-based signals above rather than
+changing the mode mid-flight. Modes and the raw JSON-RPC calls are in
+[references/socket-api.md](references/socket-api.md).
 
-Before editing `cmux.json`, copy it to a timestamped `.bak` next to it so the user can revert. Schema: `https://raw.githubusercontent.com/manaflow-ai/cmux/main/web/data/cmux.schema.json`.
-
-## Agent Hooks & Install
+## Hooks and install
 
 ```bash
 brew tap manaflow-ai/cmux && brew install --cask cmux
 sudo ln -sf /Applications/cmux.app/Contents/Resources/bin/cmux /usr/local/bin/cmux
-cmux hooks setup                                             # all detected agents
-cmux hooks setup codex|grok|antigravity|opencode             # specific agent
-npx skills add manaflow-ai/cmux -g -y                        # install cmux skills for agents
+cmux hooks setup                      # every hooked agent found on PATH
+cmux hooks setup kimi                 # one agent: codex grok opencode pi omp campfire amp cursor
+                                      # gemini kimi kiro rovodev copilot codebuddy factory qoder
+                                      # (Claude Code needs none — the cmux wrapper injects them)
+cmux sessions --json                  # what the hooks recorded, per agent, without the socket
 ```
 
-Native session-resume supported for: Claude Code, Codex, Grok, OpenCode, Pi, Amp, Cursor CLI, Gemini, Antigravity, Rovo Dev, Hermes, Copilot, CodeBuddy, Factory, Qoder.
+The hooks give three things at once: the lifecycle record above, session
+restore after a relaunch (`cmux sessions` shows what is restorable), and the
+Feed approval cards. Resume strips sensitive env vars; re-inject tokens if the
+agent needs them. Kimi Code is hooked for lifecycle and Feed but not yet for
+restore.
 
-## Socket API (advanced)
+## Non-disruptive automation
 
-`$CMUX_SOCKET_PATH` — Unix socket, JSON-RPC v2. Use for tight loops where subprocess spawn cost matters; otherwise prefer the CLI.
+1. Anchor to `CMUX_WORKSPACE_ID` and the caller's pane; never drive your own
+   surface.
+2. Never call focus-changing verbs speculatively (`select-workspace`,
+   `focus-pane`, `focus-panel`, `focus-surface`) — only on explicit request.
+   Pass `--focus false` wherever it exists.
+3. Never send input to a surface you do not own unless the user asked for that
+   routing; check `surface-health` first when the UI state may be stale.
+4. Reuse an existing helper pane; otherwise create exactly one, to the right.
+5. Idle before send, for any surface that runs an agent.
 
-```bash
-echo '{"id":"1","method":"workspace.list","params":{}}' | nc -U "$CMUX_SOCKET_PATH"
-```
+## Pitfalls
 
-Method prefixes: `system.*`, `window.*`, `workspace.*`, `pane.*`, `surface.*`, `notification.*`, `browser.*`. Full list and Python client example in `references/socket-api.md`.
+- `cmux <verb> --help` does not exist; `cmux --help` does. Grep it.
+- Recipes in `cmux-recipes/` use the socket API, not `send`/`read-screen`.
+- Skills are snapshotted when the consuming agent starts; edits to a skill
+  file need that agent restarted.
+- Legacy v1 socket payloads (`{"command":…}`) are rejected; v2 JSON-RPC only.
+- `~/.cmuxterm/<agent>-hook-sessions.json` is scrubbed of secrets and prompts,
+  but it is not empty: it carries `agentLifecycle`, `cwd`, `pid`, surface and
+  workspace ids per session — `cmux sessions --json` reads the same files.
+- A hooked agent whose store file never appears has no hooks: run
+  `cmux hooks setup <agent>` (Kimi Code writes into `~/.kimi-code/config.toml`).
+- WKWebView ≠ Chromium: no network interception, no viewport emulation.
+- macOS only.
 
-Access modes: `cmuxOnly` (default — only cmux-spawned processes), `automation` (any local process), `password`, `allowAll` (unsafe). If you hit `Failed to connect to socket`, you're likely an external process under `cmuxOnly` — switch mode in Settings > Automation or run from inside a cmux terminal.
-
-## Critical Rules — Non-Disruptive Automation
-
-These rules come from the `cmux-workspace` skill and prevent agents from yanking the user's focus:
-
-1. **Anchor to `CMUX_WORKSPACE_ID`.** Never assume the visually focused workspace is the target.
-2. **Never call focus-changing verbs speculatively.** `select-workspace`, `focus-pane`, `focus-panel`, `focus-surface` only on explicit user request. Pass `--focus false` whenever available.
-3. **Build layout additively in one call.** `cmux new-pane --type … --focus false` beats create-then-move-then-focus chains.
-4. **Right-side helper pane pattern.** Reuse an existing non-caller helper pane if present; otherwise create exactly one right-side pane.
-5. **Never send input to surfaces you don't own.** Only target surfaces in the caller's workspace unless the user explicitly asks for cross-workspace routing.
-6. **Check surface health before routing input** when UI state may be stale: `cmux surface-health`.
-
-## Common Pitfalls
-
-- **`Unknown command` → grep `cmux --help`, do not guess a variant.** Verb names differ between builds; this document can lag behind the installed one.
-- **Recipes use the socket API, not these CLI verbs.** Do not expect `cmux-recipes/` to demonstrate `send`, `send-key` or `read-screen`.
-- **Pi/Pi-like socket connection failures from external processes** → default `cmuxOnly` mode; either run inside a cmux terminal or change socket mode.
-- **macOS only.** No Linux/Windows port.
-- **WKWebView ≠ CDP.** Don't expect Playwright-equivalent network mocking or viewport emulation.
-- **Resume strips sensitive env vars.** Re-inject tokens at resume time if the agent needs them.
-- **Skills snapshot at app start.** Edits to skill files require a restart of the consuming agent.
-- **Legacy v1 socket payloads (`{"command":...}`) rejected.** Use v2 JSON-RPC only.
-- **Don't `cat ~/.cmuxterm/*-hook-sessions.json`** expecting secrets — they're scrubbed. Look there for session/surface mappings only.
-
-## Reference: Full CLI Help
-
-For any command, `cmux <cmd> --help` is authoritative. Use `cmux capabilities --json` to enumerate available socket methods in the current build.
-
-## Keyboard Shortcuts (most-used)
+## Keyboard shortcuts (most used)
 
 Workspaces: ⌘N new, ⌘1–8 jump, ⌃⌘[ / ⌃⌘] prev/next, ⌘⇧W close, ⌘B sidebar.
 Surfaces: ⌘T new, ⌘⇧[ / ⌘⇧] prev/next, ⌘W close, ⌃1–8 jump.
-Splits: ⌘D right, ⌘⇧D down, ⌥⌘D browser right, ⌥⌘←→↑↓ focus directional, ⌘⇧↵ zoom.
-Browser: ⌘⇧L open, ⌘L address bar, ⌘[/⌘] back/forward, ⌥⌘I devtools.
-App: ⌘, settings, ⌘⇧, reload-config, ⌘⇧P palette, ⌘⇧O restore session, ⌃⌥⌘. system-wide show/hide.
+Splits: ⌘D right, ⌘⇧D down, ⌥⌘D browser right, ⌥⌘←→↑↓ focus, ⌘⇧↵ zoom.
+App: ⌘, settings, ⌘⇧, reload-config, ⌘⇧P palette, ⌘⇧O restore session.
+
+## References
+
+| File | Read when |
+| :-- | :-- |
+| `references/waiting-for-an-agent.md` | you need to know when another agent session is done, or before writing any wait loop |
+| `references/browser.md` | automating a browser surface |
+| `references/socket-api.md` | calling the socket directly, access modes, the event stream |
+| `scripts/wait-idle.sh` | run it; do not reimplement it — it works for every hooked agent, not only Claude Code |

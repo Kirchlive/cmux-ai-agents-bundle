@@ -14,7 +14,7 @@ npx skills add manaflow-ai/cmux -g -y   # skill via npx
 
 | Plugin | Type | Description |
 |--------|------|-------------|
-| [cmux Control Skill](./skills/cmux-skill/SKILL.md) | skill | Full cmux CLI + socket API — workspaces, panes, surfaces, browser, notifications, session restore |
+| [cmux Control Skill](./skills/cmux-skill/SKILL.md) | skill | Full cmux CLI + socket API — workspaces, panes, surfaces, browser, notifications, session restore, and waiting for a driven agent session (`scripts/wait-idle.sh`) |
 
 ---
 
@@ -73,7 +73,7 @@ npx skills add manaflow-ai/cmux -g -y   # skill via npx
 
 | Recipe | Description |
 |--------|-------------|
-| [12 — Poll Socket for Events](./cmux-recipes/12-poll-socket-for-events/) | JSON-RPC event loop over /tmp/cmux.sock |
+| [12 — Poll Socket for Events](./cmux-recipes/12-poll-socket-for-events/) | JSON-RPC event loop over `$CMUX_SOCKET_PATH` |
 | [13 — Detect cmux Context](./cmux-recipes/13-detect-cmux-context/) | Guard any script with CMUX_WORKSPACE_ID + socket check |
 | [14 — Python RPC Client](./cmux-recipes/14-python-rpc-client/) | Two-function stdlib-only Python snippet for cmux socket |
 | [20 — Restore Session on Boot](./cmux-recipes/20-restore-session-on-boot/) | Re-build your full workspace layout after reboot |
